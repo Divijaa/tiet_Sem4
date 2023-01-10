@@ -1,0 +1,15 @@
+DBMS
+
+Dear Students
+Topics for EST are
+Joins
+Functional dependencies 
+Normalization
+Access control
+Grant/revoke 
+Views
+Hashing
+Indexing
+Transaction management
+Concurrency control 
+SQL Plus Queries
