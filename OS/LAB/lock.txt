@@ -1,0 +1,39 @@
+#include<stdio.h>
+#include<pthread.h>
+void *fun1();
+void *fun2();
+int shared=5;
+int lock=0;
+int main()
+{
+	pthread_t t1,t2;
+	pthread_create(&t1,NULL,fun1,NULL);
+	pthread_create(&t2,NULL,fun2,NULL);
+	pthread_join(t1,NULL);
+	pthread_join(t2,NULL);
+	printf("final shared= %d\n",shared);
+
+}
+void *fun1()
+{
+	int x;
+	while(lock==1);
+	lock=1;
+	x=shared;
+	x++;
+	sleep();
+	shared=x;
+	lock=0;
+}
+void *fun2()
+{
+	int y;
+	while(lock==1);
+	lock=1;
+	y=shared;
+	y--;
+	sleep();
+	shared=y;
+	lock=0;
+}
+

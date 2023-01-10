@@ -1,0 +1,484 @@
+PRODUCER CONSUMER
+
+
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdlib.h>
+#include <stdio.h>
+
+/*
+This program provides a possible solution for producer-consumer problem using mutex and semaphore.
+I have used 5 producers and 5 consumers to demonstrate the solution. You can always play with these values.
+*/
+
+#define MaxItems 5 // Maximum items a producer can produce or a consumer can consume
+#define BufferSize 5 // Size of the buffer
+
+sem_t empty;
+sem_t full;
+int in = 0;
+int out = 0;
+int buffer[BufferSize];
+pthread_mutex_t mutex;
+
+void *producer(void *pno)
+{   
+    int item;
+    for(int i = 0; i < MaxItems; i++) {
+        item = rand(); // Produce an random item
+        sem_wait(&empty);
+        pthread_mutex_lock(&mutex);
+        buffer[in] = item;
+        printf("Producer %d: Insert Item %d at %d\n", *((int *)pno),buffer[in],in);
+        in = (in+1)%BufferSize;
+        pthread_mutex_unlock(&mutex);
+        sem_post(&full);
+    }
+}
+void *consumer(void *cno)
+{   
+    for(int i = 0; i < MaxItems; i++) {
+        sem_wait(&full);
+        pthread_mutex_lock(&mutex);
+        int item = buffer[out];
+        printf("Consumer %d: Remove Item %d from %d\n",*((int *)cno),item, out);
+        out = (out+1)%BufferSize;
+        pthread_mutex_unlock(&mutex);
+        sem_post(&empty);
+    }
+}
+
+int main()
+{   
+
+    pthread_t pro[5],con[5];
+    pthread_mutex_init(&mutex, NULL);
+    sem_init(&empty,0,BufferSize);
+    sem_init(&full,0,0);
+
+    int a[5] = {1,2,3,4,5}; //Just used for numbering the producer and consumer
+
+    for(int i = 0; i < 5; i++) {
+        pthread_create(&pro[i], NULL, (void *)producer, (void *)&a[i]);
+    }
+    for(int i = 0; i < 5; i++) {
+        pthread_create(&con[i], NULL, (void *)consumer, (void *)&a[i]);
+    }
+
+    for(int i = 0; i < 5; i++) {
+        pthread_join(pro[i], NULL);
+    }
+    for(int i = 0; i < 5; i++) {
+        pthread_join(con[i], NULL);
+    }
+
+    pthread_mutex_destroy(&mutex);
+    sem_destroy(&empty);
+    sem_destroy(&full);
+
+    return 0;
+}
+
+
+
+READER WRITER
+
+
+
+#include <pthread.h>
+#include <semaphore.h>
+#include <stdio.h>
+
+/*
+This program provides a possible solution for first readers writers problem using mutex and semaphore.
+I have used 10 readers and 5 producers to demonstrate the solution. You can always play with these values.
+*/
+
+sem_t wrt;
+pthread_mutex_t mutex;
+int cnt = 1;
+int numreader = 0;
+
+void *writer(void *wno)
+{   
+    sem_wait(&wrt);
+    cnt = cnt*2;
+    printf("Writer %d modified cnt to %d\n",(*((int *)wno)),cnt);
+    sem_post(&wrt);
+
+}
+void *reader(void *rno)
+{   
+    // Reader acquire the lock before modifying numreader
+    pthread_mutex_lock(&mutex);
+    numreader++;
+    if(numreader == 1) {
+        sem_wait(&wrt); // If this id the first reader, then it will block the writer
+    }
+    pthread_mutex_unlock(&mutex);
+    // Reading Section
+    printf("Reader %d: read cnt as %d\n",*((int *)rno),cnt);
+
+    // Reader acquire the lock before modifying numreader
+    pthread_mutex_lock(&mutex);
+    numreader--;
+    if(numreader == 0) {
+        sem_post(&wrt); // If this is the last reader, it will wake up the writer.
+    }
+    pthread_mutex_unlock(&mutex);
+}
+
+int main()
+{   
+
+    pthread_t read[10],write[5];
+    pthread_mutex_init(&mutex, NULL);
+    sem_init(&wrt,0,1);
+
+    int a[10] = {1,2,3,4,5,6,7,8,9,10}; //Just used for numbering the producer and consumer
+
+    for(int i = 0; i < 10; i++) {
+        pthread_create(&read[i], NULL, (void *)reader, (void *)&a[i]);
+    }
+    for(int i = 0; i < 5; i++) {
+        pthread_create(&write[i], NULL, (void *)writer, (void *)&a[i]);
+    }
+
+    for(int i = 0; i < 10; i++) {
+        pthread_join(read[i], NULL);
+    }
+    for(int i = 0; i < 5; i++) {
+        pthread_join(write[i], NULL);
+    }
+
+    pthread_mutex_destroy(&mutex);
+    sem_destroy(&wrt);
+
+    return 0;
+    
+}
+
+
+DINING PHILOSPHER
+
+
+
+#include<stdio.h>
+#include<stdlib.h>
+#include<pthread.h>
+#include<semaphore.h>
+#include<unistd.h>
+sem_t chopstick[5];
+void * philos(void *);
+void eat(int);
+int main()
+ {
+         int i,n[5];
+         pthread_t T[5];
+         for(i=0;i<5;i++)
+         sem_init(&chopstick[i],0,1);
+         for(i=0;i<5;i++){
+                 n[i]=i;
+                 pthread_create(&T[i],NULL,philos,(void *)&n[i]);
+                 }
+         for(i=0;i<5;i++)
+                 pthread_join(T[i],NULL);
+ }
+void * philos(void * n)
+ {
+         int ph=*(int *)n;
+         printf("Philosopher %d wants to eat\n",ph);
+         printf("Philosopher %d tries to pick left chopstick\n",ph);
+         sem_wait(&chopstick[ph]);
+         printf("Philosopher %d picks the left chopstick\n",ph);
+         printf("Philosopher %d tries to pick the right chopstick\n",ph);
+         sem_wait(&chopstick[(ph+1)%5]);
+         printf("Philosopher %d picks the right chopstick\n",ph);
+         eat(ph);
+         sleep(2);
+         printf("Philosopher %d has finished eating\n",ph);
+         sem_post(&chopstick[(ph+1)%5]);
+         printf("Philosopher %d leaves the right chopstick\n",ph);
+         sem_post(&chopstick[ph]);
+         printf("Philosopher %d leaves the left chopstick\n",ph);
+ }
+ void eat(int ph)
+ {
+         printf("Philosopher %d begins to eat\n",ph);
+ }
+
+
+thread creation
+
+
+
+ #include<stdio.h>
+#include<stdlib.h>
+#include<unistd.h>
+#include<pthread.h>
+void *thread_function(void *arg);
+ int i,j;
+ int main() 
+{
+ pthread_t a_thread;  //thread declaration  
+
+pthread_create(&a_thread, NULL, thread_function, NULL); 
+//thread is created
+ pthread_join(a_thread, NULL); //process waits for thread to finish . //Comment this line to see the difference
+ 
+printf("Inside Main Program\n");
+ 
+for(j=20;j<25;j++)
+ {
+ printf("%d\n",j);
+ sleep(1);
+ }
+
+}
+
+void *thread_function(void *arg)
+ {    
+// the work to be done by the thread is defined in this function
+ printf("Inside Thread\n");
+ for(i=0;i<5;i++)
+ {
+ printf("%d\n",i);
+ sleep(1);
+ }
+
+ }
+
+
+race condition
+
+#include<pthread.h>
+#include<stdio.h>
+#include<unistd.h>
+
+void *fun1();
+void *fun2();
+
+//shared variable
+int shared = 5;
+
+int main(){
+
+pthread_t thread1 , thread2 ;
+pthread_create(&thread1 , NULL , fun1 , NULL);
+pthread_create(&thread2 , NULL , fun2 , NULL);
+pthread_join(thread1, NULL);
+pthread_join(thread2, NULL);
+printf("final value of shared is %d\n" , shared);
+}
+
+void *fun1()
+{
+
+int x ;
+x = shared;
+printf("thread1 reads the value of shared variable as %d\n" , x);
+x++;
+printf("Local updation by thread1 : %d\n", x);
+sleep(1);
+shared = x;
+printf("value of shared variable updated by thread1 is : %d\n" , shared);
+}
+
+void *fun2()
+{
+
+int y ;
+y = shared;
+printf("thread2 reads the value of shared variable as %d\n" , y);
+y--;
+printf("Local updation by thread2 : %d\n", y);
+sleep(1);
+shared = y;
+printf("value of shared variable updated by thread2 is : %d\n" , shared);
+}
+
+
+solution to race condition using semaphore
+
+
+
+#include<stdio.h>
+#include<semaphore.h>
+#include<unistd.h>
+#include<pthread.h>
+
+void *p1(void *argv);
+void *p2(void *argv);
+
+int shared = 5;
+sem_t s;
+
+int main(){
+	
+	pthread_t thread1;
+	pthread_t thread2;
+
+	//The value of the initialised semaphore here is 1.	
+	sem_init(&s,0,1);
+	
+	pthread_create(&thread1,NULL,p1,NULL);
+	pthread_create(&thread2,NULL,p2,NULL);
+	
+	pthread_join(thread1,NULL);
+	pthread_join(thread2,NULL);
+	
+	printf("shared = %d\n",shared);
+}
+void *p1(void *argv)
+{
+	sem_wait(&s);
+        int x=shared;
+	x++;
+	printf("P1 in critical section\n");
+	sleep(1);
+	shared =x;
+	printf("shread variable updation in function 1 = %d\n",shared);
+	//sem_post() function unlocks the semaphore
+ printf("P1 is out of the  critical section\n");
+	sem_post(&s);
+}
+void *p2(void *argv)
+{
+	sem_wait(&s);
+	int y=shared;
+	y--;
+printf("P2 in critical section\n");
+	sleep(1);
+	shared=y;
+	printf("shared variable updation by function 2= %d\n",shared);
+ printf("P2 is out of the  critical section\n");
+	sem_post(&s);
+}
+
+
+TURN 
+
+
+#include<stdio.h>
+#include<pthread.h>
+void *fun1();
+void *fun2();
+int shared=5;
+int turn=0;
+int main()
+{
+	pthread_t t1,t2;
+	pthread_create(&t1,NULL,fun1,NULL);
+	pthread_create(&t2,NULL,fun2,NULL);
+	pthread_join(t1,NULL);
+	pthread_join(t2,NULL);
+	printf("final shared= %d\n",shared);
+
+}
+void *fun1()
+{
+	int x;
+	while(turn!=1);
+	x=shared;
+	x++;
+	sleep();
+	shared=x;
+	turn=0;
+}
+void *fun2()
+{
+	int y;
+	while(turn!=0);
+	y=shared;
+	y--;
+	sleep();
+	shared=y;
+	turn=1;
+}
+
+LOCK 
+
+
+#include<stdio.h>
+#include<pthread.h>
+void *fun1();
+void *fun2();
+int shared=5;
+int lock=0;
+int main()
+{
+	pthread_t t1,t2;
+	pthread_create(&t1,NULL,fun1,NULL);
+	pthread_create(&t2,NULL,fun2,NULL);
+	pthread_join(t1,NULL);
+	pthread_join(t2,NULL);
+	printf("final shared= %d\n",shared);
+
+}
+void *fun1()
+{
+	int x;
+	while(lock==1);
+	lock=1;
+	x=shared;
+	x++;
+	sleep();
+	shared=x;
+	lock=0;
+}
+void *fun2()
+{
+	int y;
+	while(lock==1);
+	lock=1;
+	y=shared;
+	y--;
+	sleep();
+	shared=y;
+	lock=0;
+}
+
+PETERSON
+
+#include<stdio.h>
+#include<pthread.h>
+void *fun1();
+void *fun2();
+#define TRUE 1
+#define FALSE 0
+int flag[2] ={FALSE , FALSE};
+int turn=0;
+int i = 0 ; 
+int j = 1;
+int main()
+{
+	pthread_t t1,t2;
+	pthread_create(&t1,NULL,fun1,NULL);
+	pthread_create(&t2,NULL,fun2,NULL);
+	pthread_join(t1,NULL);
+	pthread_join(t2,NULL);
+//	printf("final shared= %d\n",shared);
+
+}
+void *fun1()
+{
+flag[i] = TRUE;
+turn = j;
+printf("process 1 tries to enter\n");
+while(flag[j] == TRUE && turn == j);
+printf("process 1 is in critical sectio\n");
+sleep(2);
+flag[i] = FALSE;
+printf("process 1 is out\n");
+}
+void *fun2()
+{
+flag[j] = TRUE;
+turn = i;
+printf("process 2 tries to enter\n");
+while(flag[i] == TRUE && turn == i);
+printf("process 2 is in critical section\n");
+sleep(1);
+flag[j] = FALSE;
+printf("process 2 is out\n");
+}
