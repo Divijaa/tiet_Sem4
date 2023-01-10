@@ -1,0 +1,12 @@
+function out=constraint(x)
+x1=x(:,1)
+x2=x(:,2)
+cons1=((2.*x1)+(4.*x2)-8)
+s1=find(cons1>0)
+x(s1,:)=[]
+x1=x(:,1)
+x2=x(:,2)
+cons2 =((3.*x1)+(5.*x2)-15)
+s2=find(cons2<0)
+x(s2,:)=[]
+out=x
